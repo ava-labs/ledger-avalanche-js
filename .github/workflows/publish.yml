@@ -26,7 +26,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           registry-url: 'https://registry.npmjs.org'
-          scope: '@zondax'
+          scope: '@avalabs'
       - run: mv README-npm.md README.md
       - name: Install yarn
         run: npm install -g yarn
@@ -41,6 +41,6 @@ jobs:
           npm --allow-same-version --no-git-tag-version version ${{ steps.get_version.outputs.version }}
       - name: Publish package
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_PUBLISH_AUTO }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           npm publish
