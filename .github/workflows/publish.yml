@@ -3,8 +3,7 @@ name: 'Publish packages'
 on:
   release:
     types:
-      - published
-      - edited
+      - created
     tags:
       - "v[0-9]+(\\.[0-9]+)*"
 
@@ -27,7 +26,6 @@ jobs:
         with:
           registry-url: 'https://registry.npmjs.org'
           scope: '@avalabs'
-      - run: mv README-npm.md README.md
       - name: Install yarn
         run: npm install -g yarn
       - run: yarn install
@@ -40,7 +38,7 @@ jobs:
           echo Publishing as ${{ steps.get_version.outputs.version }}
           npm --allow-same-version --no-git-tag-version version ${{ steps.get_version.outputs.version }}
       - name: Publish package
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
