@@ -43,6 +43,11 @@ export const P1_VALUES = {
   SHOW_ADDRESS_IN_DEVICE: 0x01,
 }
 
+export const P2_VALUES = {
+  SECP256K1: 0x00,
+  ED25519: 0x01,
+}
+
 export enum LedgerError {
   U2FUnknown = 1,
   U2FBadRequest = 2,
