@@ -42,6 +42,7 @@ import {
   TYPE_1,
   VERSION_1,
   P2_VALUES,
+  ED25519_PK_SIZE,
 } from './common'
 import { pathCoinType, serializeChainID, serializeHrp, serializePath, serializePathSuffix } from './helper'
 import { ResponseAddress, ResponseAppInfo, ResponseBase, ResponseSign, ResponseVersion, ResponseWalletId, ResponseXPub } from './types'
@@ -68,7 +69,7 @@ function processGetAddrResponse(response: Buffer) {
   partialResponse = partialResponse.slice(1 + PKLEN)
 
   let hash: Buffer | undefined
-  if(PKLEN != 32) {
+  if(PKLEN != ED25519_PK_SIZE) {
     hash = Buffer.from(partialResponse.slice(0, 20))
   }
 
@@ -311,7 +312,7 @@ export default class AvalancheApp {
     return result
   }
 
-  async sign(path_prefix: string, signing_paths: Array<string>, message: Buffer, curve_type: number = P2_VALUES.SECP256K1, change_paths?: Array<string>): Promise<ResponseSign> {
+  async sign(path_prefix: string, signing_paths: Array<string>, message: Buffer, change_paths?: Array<string>, curve_type: number = P2_VALUES.SECP256K1): Promise<ResponseSign> {
     // Do not show outputs that go to the signers
     let paths = signing_paths
     if (change_paths !== undefined) {
@@ -458,7 +459,7 @@ export default class AvalancheApp {
     }, processErrorResponse)
   }
 
-  private async _pubkey(path: string, show: boolean, curve_type: number, hrp?: string, chainid?: string): Promise<ResponseAddress> {
+  private async _pubkey(path: string, show: boolean, hrp?: string, chainid?: string, curve_type: number,): Promise<ResponseAddress> {
     const p1 = show ? P1_VALUES.SHOW_ADDRESS_IN_DEVICE : P1_VALUES.ONLY_RETRIEVE
     const serializedPath = serializePath(path)
    // Validate curve type
@@ -479,8 +480,8 @@ export default class AvalancheApp {
       .then(processGetAddrResponse, processErrorResponse)
   }
 
-  async getAddressAndPubKey(path: string, show: boolean, curve_type: number = P2_VALUES.SECP256K1, hrp?: string, chainid?: string) {
-    return this._pubkey(path, show, curve_type, hrp, chainid)
+  async getAddressAndPubKey(path: string, show: boolean, hrp?: string, chainid?: string, curve_type: number = P2_VALUES.SECP256K1,) {
+    return this._pubkey(path, show, hrp, chainid, curve_type)
   }
 
   private async _xpub(path: string, show: boolean, hrp?: string, chainid?: string): Promise<ResponseXPub> {

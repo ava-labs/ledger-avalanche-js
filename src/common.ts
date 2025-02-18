@@ -20,6 +20,7 @@ export const ALGORITHM_ID_SIZE = 1
 export const TYPE_SIZE = 1
 export const VERSION_SIZE = 1
 export const SIGNATURE_LENGTH_SIZE = 1
+export const ED25519_PK_SIZE = 32
 
 export const INS = {
   GET_VERSION: 0x00,
