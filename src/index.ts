@@ -41,6 +41,8 @@ import {
   processErrorResponse,
   TYPE_1,
   VERSION_1,
+  P2_VALUES,
+  ED25519_PK_SIZE,
 } from './common'
 import { pathCoinType, serializeChainID, serializeHrp, serializePath, serializePathSuffix } from './helper'
 import { ResponseAddress, ResponseAppInfo, ResponseBase, ResponseSign, ResponseVersion, ResponseWalletId, ResponseXPub } from './types'
@@ -66,7 +68,10 @@ function processGetAddrResponse(response: Buffer) {
   //"advance" buffer
   partialResponse = partialResponse.slice(1 + PKLEN)
 
-  const hash = Buffer.from(partialResponse.slice(0, 20))
+  let hash: Buffer | undefined
+  if(PKLEN != ED25519_PK_SIZE) {
+    hash = Buffer.from(partialResponse.slice(0, 20))
+  }
 
   //"advance" buffer
   partialResponse = partialResponse.slice(20)
@@ -221,7 +226,7 @@ export default class AvalancheApp {
       }, processErrorResponse)
   }
 
-  async signHash(path_prefix: string, signing_paths: Array<string>, hash: Buffer): Promise<ResponseSign> {
+  async signHash(path_prefix: string, signing_paths: Array<string>, hash: Buffer, curve_type: number = P2_VALUES.SECP256K1): Promise<ResponseSign> {
     if (hash.length !== HASH_LEN) {
       throw new Error('Invalid hash length')
     }
@@ -247,10 +252,10 @@ export default class AvalancheApp {
       return first_response
     }
 
-    return this._signAndCollect(signing_paths)
+    return this._signAndCollect(signing_paths, curve_type)
   }
 
-  private async _signAndCollect(signing_paths: Array<string>): Promise<ResponseSign> {
+  private async _signAndCollect(signing_paths: Array<string>, curve_type: number): Promise<ResponseSign> {
     // base response object to output on each iteration
     const result = {
       returnCode: LedgerError.NoErrors,
@@ -270,7 +275,7 @@ export default class AvalancheApp {
 
       // send path to sign hash that should be in device's ram memory
       await this.transport
-        .send(CLA, INS.SIGN_HASH, p1, 0x00, path_buf, [
+        .send(CLA, INS.SIGN_HASH, p1, curve_type, path_buf, [
           LedgerError.NoErrors,
           LedgerError.DataIsInvalid,
           LedgerError.BadKeyHandle,
@@ -307,7 +312,7 @@ export default class AvalancheApp {
     return result
   }
 
-  async sign(path_prefix: string, signing_paths: Array<string>, message: Buffer, change_paths?: Array<string>): Promise<ResponseSign> {
+  async sign(path_prefix: string, signing_paths: Array<string>, message: Buffer, change_paths?: Array<string>, curve_type: number = P2_VALUES.SECP256K1): Promise<ResponseSign> {
     // Do not show outputs that go to the signers
     let paths = signing_paths
     if (change_paths !== undefined) {
@@ -347,14 +352,14 @@ export default class AvalancheApp {
 
     // Transaction was approved so start iterating over signing_paths to sign
     // and collect each signature
-    return this._signAndCollect(signing_paths)
+    return this._signAndCollect(signing_paths, curve_type)
   }
 
   // Sign an arbitrary message.
   // This function takes in an avax path prefix like: m/44'/9000'/0'/0'
   // signing_paths: ["0/1", "5/8"]
   // message: The message to be signed
-  async signMsg(path_prefix: string, signing_paths: Array<string>, message: string): Promise<ResponseSign> {
+  async signMsg(path_prefix: string, signing_paths: Array<string>, message: string, curve_type: number = P2_VALUES.SECP256K1): Promise<ResponseSign> {
     const coinType = pathCoinType(path_prefix)
 
     if (coinType !== "9000'") {
@@ -398,7 +403,7 @@ export default class AvalancheApp {
 
     // Message was approved so start iterating over signing_paths to sign
     // and collect each signature
-    return this._signAndCollect(signing_paths)
+    return this._signAndCollect(signing_paths, curve_type)
   }
 
   async getVersion(): Promise<ResponseVersion> {
@@ -454,19 +459,29 @@ export default class AvalancheApp {
     }, processErrorResponse)
   }
 
-  private async _pubkey(path: string, show: boolean, hrp?: string, chainid?: string): Promise<ResponseAddress> {
+  private async _pubkey(path: string, show: boolean, hrp?: string, chainid?: string, curve_type: number,): Promise<ResponseAddress> {
     const p1 = show ? P1_VALUES.SHOW_ADDRESS_IN_DEVICE : P1_VALUES.ONLY_RETRIEVE
     const serializedPath = serializePath(path)
-    const serializedHrp = serializeHrp(hrp)
-    const serializedChainID = serializeChainID(chainid)
+   // Validate curve type
+    if (curve_type !== P2_VALUES.SECP256K1 && curve_type !== P2_VALUES.ED25519) {
+      throw new Error('Invalid curve type. Must be 0 for secp256k1 or 1 for ed25519')
+    }
+
+    const payload = curve_type === P2_VALUES.SECP256K1 
+      ? Buffer.concat([
+          new Uint8Array(serializeHrp(hrp)), 
+          new Uint8Array(serializeChainID(chainid)), 
+          new Uint8Array(serializedPath)
+        ])
+      : serializedPath
 
     return this.transport
-      .send(CLA, INS.GET_ADDR, p1, 0, Buffer.concat([new Uint8Array(serializedHrp), new Uint8Array(serializedChainID), new Uint8Array(serializedPath)]), [LedgerError.NoErrors])
+      .send(CLA, INS.GET_ADDR, p1, curve_type, payload, [LedgerError.NoErrors])
       .then(processGetAddrResponse, processErrorResponse)
   }
 
-  async getAddressAndPubKey(path: string, show: boolean, hrp?: string, chainid?: string) {
-    return this._pubkey(path, show, hrp, chainid)
+  async getAddressAndPubKey(path: string, show: boolean, hrp?: string, chainid?: string, curve_type: number = P2_VALUES.SECP256K1,) {
+    return this._pubkey(path, show, hrp, chainid, curve_type)
   }
 
   private async _xpub(path: string, show: boolean, hrp?: string, chainid?: string): Promise<ResponseXPub> {

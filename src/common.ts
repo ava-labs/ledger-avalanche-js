@@ -20,6 +20,7 @@ export const ALGORITHM_ID_SIZE = 1
 export const TYPE_SIZE = 1
 export const VERSION_SIZE = 1
 export const SIGNATURE_LENGTH_SIZE = 1
+export const ED25519_PK_SIZE = 32
 
 export const INS = {
   GET_VERSION: 0x00,
@@ -41,6 +42,11 @@ export const PAYLOAD_TYPE = {
 export const P1_VALUES = {
   ONLY_RETRIEVE: 0x00,
   SHOW_ADDRESS_IN_DEVICE: 0x01,
+}
+
+export const P2_VALUES = {
+  SECP256K1: 0x00,
+  ED25519: 0x01,
 }
 
 export enum LedgerError {
