@@ -459,7 +459,7 @@ export default class AvalancheApp {
     }, processErrorResponse)
   }
 
-  private async _pubkey(path: string, show: boolean, hrp?: string, chainid?: string, curve_type: number,): Promise<ResponseAddress> {
+  private async _pubkey(path: string, show: boolean, hrp?: string, chainid?: string, curve_type: number = P2_VALUES.SECP256K1): Promise<ResponseAddress> {
     const p1 = show ? P1_VALUES.SHOW_ADDRESS_IN_DEVICE : P1_VALUES.ONLY_RETRIEVE
     const serializedPath = serializePath(path)
    // Validate curve type
