@@ -69,14 +69,18 @@ function processGetAddrResponse(response: Buffer) {
   partialResponse = partialResponse.slice(1 + PKLEN)
 
   let hash: Buffer | undefined
+  let address: string;
+
   if(PKLEN != ED25519_PK_SIZE) {
     hash = Buffer.from(partialResponse.slice(0, 20))
+
+    //"advance" buffer
+    partialResponse = partialResponse.slice(20)
+    address = Buffer.from(partialResponse.subarray(0, -2)).toString()
+  } else {
+      // ED25519: Convert raw bytes to hex string
+      address = partialResponse.subarray(0, -2).toString('hex');
   }
-
-  //"advance" buffer
-  partialResponse = partialResponse.slice(20)
-
-  const address = Buffer.from(partialResponse.subarray(0, -2)).toString()
 
   return {
     publicKey,
