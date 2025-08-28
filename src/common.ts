@@ -1,26 +1,26 @@
-import Transport from '@ledgerhq/hw-transport'
+import Transport from "@ledgerhq/hw-transport";
 
-export const CLA = 0x80
-export const CLA_ETH = 0xe0
-export const CHUNK_SIZE = 250
-export const APP_KEY = 'AVAX'
-export const FIRST_MESSAGE = 0x01
-export const LAST_MESSAGE = 0x02
-export const NEXT_MESSAGE = 0x03
-export const HASH_LEN = 32
+export const CLA = 0x80;
+export const CLA_ETH = 0xe0;
+export const CHUNK_SIZE = 250;
+export const APP_KEY = "AVAX";
+export const FIRST_MESSAGE = 0x01;
+export const LAST_MESSAGE = 0x02;
+export const NEXT_MESSAGE = 0x03;
+export const HASH_LEN = 32;
 
-export const COLLECTION_NAME_MAX_LEN = 70
-export const CHAIN_ID_SIZE = 8
-export const CONTRACT_ADDRESS_LEN = 20
-export const TYPE_1 = 1
-export const VERSION_1 = 1
-export const ADDRESS_LENGTH = 20
-export const ALGORITHM_ID_1 = 1
-export const ALGORITHM_ID_SIZE = 1
-export const TYPE_SIZE = 1
-export const VERSION_SIZE = 1
-export const SIGNATURE_LENGTH_SIZE = 1
-export const ED25519_PK_SIZE = 32
+export const COLLECTION_NAME_MAX_LEN = 70;
+export const CHAIN_ID_SIZE = 8;
+export const CONTRACT_ADDRESS_LEN = 20;
+export const TYPE_1 = 1;
+export const VERSION_1 = 1;
+export const ADDRESS_LENGTH = 20;
+export const ALGORITHM_ID_1 = 1;
+export const ALGORITHM_ID_SIZE = 1;
+export const TYPE_SIZE = 1;
+export const VERSION_SIZE = 1;
+export const SIGNATURE_LENGTH_SIZE = 1;
+export const ED25519_PK_SIZE = 32;
 
 export const INS = {
   GET_VERSION: 0x00,
@@ -31,23 +31,23 @@ export const INS = {
   SIGN: 0x05,
   SIGN_MSG: 0x06,
   ETH_PROVIDE_NFT_INFO: 0x14,
-}
+};
 
 export const PAYLOAD_TYPE = {
   INIT: 0x00,
   ADD: 0x01,
   LAST: 0x02,
-}
+};
 
 export const P1_VALUES = {
   ONLY_RETRIEVE: 0x00,
   SHOW_ADDRESS_IN_DEVICE: 0x01,
-}
+};
 
 export const P2_VALUES = {
   SECP256K1: 0x00,
   ED25519: 0x01,
-}
+};
 
 export enum LedgerError {
   U2FUnknown = 1,
@@ -75,75 +75,91 @@ export enum LedgerError {
 }
 
 export const ERROR_DESCRIPTION = {
-  [LedgerError.U2FUnknown]: 'U2F: Unknown',
-  [LedgerError.U2FBadRequest]: 'U2F: Bad request',
-  [LedgerError.U2FConfigurationUnsupported]: 'U2F: Configuration unsupported',
-  [LedgerError.U2FDeviceIneligible]: 'U2F: Device Ineligible',
-  [LedgerError.U2FTimeout]: 'U2F: Timeout',
-  [LedgerError.Timeout]: 'Timeout',
-  [LedgerError.NoErrors]: 'No errors',
-  [LedgerError.DeviceIsBusy]: 'Device is busy',
-  [LedgerError.ErrorDerivingKeys]: 'Error deriving keys',
-  [LedgerError.ExecutionError]: 'Execution Error',
-  [LedgerError.WrongLength]: 'Wrong Length',
-  [LedgerError.EmptyBuffer]: 'Empty Buffer',
-  [LedgerError.OutputBufferTooSmall]: 'Output buffer too small',
-  [LedgerError.DataIsInvalid]: 'Data is invalid',
-  [LedgerError.ConditionsNotSatisfied]: 'Conditions not satisfied',
-  [LedgerError.TransactionRejected]: 'Transaction rejected',
-  [LedgerError.BadKeyHandle]: 'Bad key handle',
-  [LedgerError.InvalidP1P2]: 'Invalid P1/P2',
-  [LedgerError.InstructionNotSupported]: 'Instruction not supported',
-  [LedgerError.AppDoesNotSeemToBeOpen]: 'App does not seem to be open',
-  [LedgerError.UnknownError]: 'Unknown error',
-  [LedgerError.SignVerifyError]: 'Sign/verify error',
-}
+  [LedgerError.U2FUnknown]: "U2F: Unknown",
+  [LedgerError.U2FBadRequest]: "U2F: Bad request",
+  [LedgerError.U2FConfigurationUnsupported]: "U2F: Configuration unsupported",
+  [LedgerError.U2FDeviceIneligible]: "U2F: Device Ineligible",
+  [LedgerError.U2FTimeout]: "U2F: Timeout",
+  [LedgerError.Timeout]: "Timeout",
+  [LedgerError.NoErrors]: "No errors",
+  [LedgerError.DeviceIsBusy]: "Device is busy",
+  [LedgerError.ErrorDerivingKeys]: "Error deriving keys",
+  [LedgerError.ExecutionError]: "Execution Error",
+  [LedgerError.WrongLength]: "Wrong Length",
+  [LedgerError.EmptyBuffer]: "Empty Buffer",
+  [LedgerError.OutputBufferTooSmall]: "Output buffer too small",
+  [LedgerError.DataIsInvalid]: "Data is invalid",
+  [LedgerError.ConditionsNotSatisfied]: "Conditions not satisfied",
+  [LedgerError.TransactionRejected]: "Transaction rejected",
+  [LedgerError.BadKeyHandle]: "Bad key handle",
+  [LedgerError.InvalidP1P2]: "Invalid P1/P2",
+  [LedgerError.InstructionNotSupported]: "Instruction not supported",
+  [LedgerError.AppDoesNotSeemToBeOpen]: "App does not seem to be open",
+  [LedgerError.UnknownError]: "Unknown error",
+  [LedgerError.SignVerifyError]: "Sign/verify error",
+};
 
 export function errorCodeToString(statusCode: LedgerError) {
-  if (statusCode in ERROR_DESCRIPTION) return ERROR_DESCRIPTION[statusCode]
-  return `Unknown Status Code: ${statusCode}`
+  if (statusCode in ERROR_DESCRIPTION) {
+    return ERROR_DESCRIPTION[statusCode];
+  }
+  return `Unknown Status Code: ${statusCode}`;
 }
 
 function isDict(v: any) {
-  return typeof v === 'object' && v !== null && !(v instanceof Array) && !(v instanceof Date)
+  return (
+    typeof v === "object" &&
+    v !== null &&
+    !(v instanceof Array) &&
+    !(v instanceof Date)
+  );
 }
 
 export function processErrorResponse(response?: any) {
   if (response) {
     if (isDict(response)) {
-      if (Object.prototype.hasOwnProperty.call(response, 'statusCode')) {
+      if (Object.prototype.hasOwnProperty.call(response, "statusCode")) {
         return {
           returnCode: response.statusCode,
           errorMessage: errorCodeToString(response.statusCode),
-        }
+        };
       }
 
-      if (Object.prototype.hasOwnProperty.call(response, 'returnCode') && Object.prototype.hasOwnProperty.call(response, 'errorMessage')) {
-        return response
+      if (
+        Object.prototype.hasOwnProperty.call(response, "returnCode") &&
+        Object.prototype.hasOwnProperty.call(response, "errorMessage")
+      ) {
+        return response;
       }
     }
     return {
       returnCode: 0xffff,
       errorMessage: response.toString(),
-    }
+    };
   }
 
   return {
     returnCode: 0xffff,
     errorMessage: response.toString(),
-  }
+  };
 }
 
-export async function getVersion(transport: Transport) {
-  return transport.send(CLA, INS.GET_VERSION, 0, 0).then(response => {
-    const errorCodeData = response.slice(-2)
-    const returnCode = (errorCodeData[0] * 256 + errorCodeData[1]) as LedgerError
+export function getVersion(transport: Transport) {
+  return transport.send(CLA, INS.GET_VERSION, 0, 0).then((response) => {
+    const errorCodeData = response.slice(-2);
+    if (errorCodeData.length < 2) {
+      throw new Error("Invalid response: missing error code data");
+    }
+    const returnCode = (errorCodeData[0]! * 256 +
+      errorCodeData[1]!) as LedgerError;
 
-    let targetId = 0
+    let targetId = 0;
     if (response.length >= 9) {
-      /* eslint-disable no-bitwise */
-      targetId = (response[5] << 24) + (response[6] << 16) + (response[7] << 8) + (response[8] << 0)
-      /* eslint-enable no-bitwise */
+      targetId =
+        (response[5]! << 24) +
+        (response[6]! << 16) +
+        (response[7]! << 8) +
+        (response[8]! << 0);
     }
 
     return {
@@ -155,6 +171,6 @@ export async function getVersion(transport: Transport) {
       patch: response[3],
       deviceLocked: response[4] === 1,
       targetId: targetId.toString(16),
-    }
-  }, processErrorResponse)
+    };
+  }, processErrorResponse);
 }
