@@ -1,4 +1,4 @@
-name: 'Publish packages'
+name: "Publish packages"
 
 on:
   release:
@@ -24,8 +24,8 @@ jobs:
       - name: Install node
         uses: actions/setup-node@v4
         with:
-          registry-url: 'https://registry.npmjs.org'
-          scope: '@avalabs'
+          registry-url: "https://registry.npmjs.org"
+          scope: "@avalabs"
       - name: Install yarn
         run: npm install -g yarn
       - name: Create .npmrc
