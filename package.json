@@ -22,8 +22,17 @@
   "module": "./esm/index.js",
   "types": "./dist/index.d.ts",
   "typings": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./esm/index.js",
+      "require": "./dist/index.js"
+    }
+  },
   "scripts": {
-    "build": "tsc",
+    "build": "npm run build:cjs & npm run build:esm & wait",
+    "build:cjs": "tsc",
+    "build:esm": "esbuild src/index.ts --bundle --platform=neutral --format=esm --outfile=esm/index.js --external:@ledgerhq/* --external:bs58",
     "format": "FORCE_COLOR=1 prettier --write . && sort-package-json",
     "format:check": "FORCE_COLOR=1 prettier --check .",
     "lint": "eslint .",
@@ -67,5 +76,6 @@
     "plugins": {
       "autoprefixer": {}
     }
-  }
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }
