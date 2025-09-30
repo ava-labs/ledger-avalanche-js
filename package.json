@@ -18,12 +18,21 @@
   },
   "license": "Apache-2.0",
   "author": "Zondax AG",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./esm/index.js",
+      "require": "./dist/index.js"
+    }
+  },
   "main": "./dist/index.js",
   "module": "./esm/index.js",
   "types": "./dist/index.d.ts",
   "typings": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "npm run build:cjs & npm run build:esm & wait",
+    "build:cjs": "tsc",
+    "build:esm": "esbuild src/index.ts --bundle --platform=neutral --format=esm --outfile=esm/index.js --external:@ledgerhq/* --external:bs58",
     "format": "FORCE_COLOR=1 prettier --write . && sort-package-json",
     "format:check": "FORCE_COLOR=1 prettier --check .",
     "lint": "eslint .",
@@ -36,8 +45,8 @@
     "last 2 versions"
   ],
   "dependencies": {
-    "@ledgerhq/hw-app-eth": "6.45.16",
-    "@ledgerhq/hw-transport": "6.31.9",
+    "@ledgerhq/hw-app-eth": "6.45.18",
+    "@ledgerhq/hw-transport": "6.31.10",
     "@ledgerhq/types-live": "6.82.0",
     "bs58": "6.0.0"
   },
