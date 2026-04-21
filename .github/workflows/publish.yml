@@ -20,9 +20,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@v4
       - name: Install node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@v4
         with:
           registry-url: "https://registry.npmjs.org"
           scope: "@avalabs"
@@ -34,7 +34,7 @@ jobs:
       - run: yarn build
       - name: Get latest release version number
         id: get_version
-        uses: battila7/get-version-action@d97fbc34ceb64d1f5d95f4dfd6dce33521ccccf5 # v2
+        uses: battila7/get-version-action@v2
       - name: Update tag
         run: |
           echo Publishing as ${{ steps.get_version.outputs.version }}
