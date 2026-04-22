@@ -1,47 +1,53 @@
-name: "Publish packages"
+name: Publish Package
 
 on:
+  pull_request:
+    branches:
+      - main
+      - develop
+      - release/*
   release:
     types:
-      - created
-    tags:
-      - "v[0-9]+(\\.[0-9]+)*"
+      - published
+
+permissions:
+  contents: read
+  id-token: write # Required for npm OIDC trusted publishing
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  configure:
+  publish:
     runs-on: ubuntu-latest
-    outputs:
-      datetime: ${{ steps.get-datetime.outputs.datetime }}
-    steps:
-      - id: get-datetime
-        run: echo "datetime=$(date +'%Y%m%d%H%M%S')" >> $GITHUB_OUTPUT
 
-  publish_npm_package:
-    runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Install node
-        uses: actions/setup-node@v4
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
         with:
           registry-url: "https://registry.npmjs.org"
           scope: "@avalabs"
+
       - name: Install yarn
         run: npm install -g yarn
-      - name: Create .npmrc
-        run: echo '//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}' >> .npmrc
-      - run: yarn install
-      - run: yarn build
-      - name: Get latest release version number
-        id: get_version
-        uses: battila7/get-version-action@v2
-      - name: Update tag
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build package
+        run: yarn build
+
+      - name: Set package.json version from tag
+        if: github.event_name == 'release'
         run: |
-          echo Publishing as ${{ steps.get_version.outputs.version }}
-          npm --allow-same-version --no-git-tag-version version ${{ steps.get_version.outputs.version }}
-      - name: Publish package
-        run: |
-          npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          echo "Publishing version ${VERSION}"
+          npm --allow-same-version --no-git-tag-version version "${VERSION}"
+
+      - name: Publish to npm (OIDC trusted publisher)
+        if: github.event_name == 'release'
+        run: npm publish --access public
