@@ -32,14 +32,16 @@ jobs:
           registry-url: "https://registry.npmjs.org"
           scope: "@avalabs"
 
-      - name: Install yarn
-        run: npm install -g yarn
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Build package
-        run: yarn build
+        run: pnpm build
 
       - name: Set package.json version from tag
         if: github.event_name == 'release'

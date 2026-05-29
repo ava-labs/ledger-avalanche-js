@@ -30,15 +30,15 @@
   "types": "./dist/index.d.ts",
   "typings": "./dist/index.d.ts",
   "scripts": {
-    "build": "npm run build:cjs & npm run build:esm & wait",
+    "build": "pnpm build:cjs & pnpm build:esm & wait",
     "build:cjs": "tsc",
     "build:esm": "esbuild src/index.ts --bundle --platform=neutral --format=esm --outfile=esm/index.js --external:@ledgerhq/* --external:bs58",
     "format": "FORCE_COLOR=1 prettier --write . && sort-package-json",
     "format:check": "FORCE_COLOR=1 prettier --check .",
     "lint": "eslint .",
     "lint:fix": "eslint --fix .",
-    "test": "yarn build && jest",
-    "upgrade": "bunx npm-check-updates -i"
+    "test": "pnpm build && jest --passWithNoTests",
+    "upgrade": "pnpm dlx npm-check-updates -i"
   },
   "browserslist": [
     "> 1%",
