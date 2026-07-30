@@ -1,0 +1,4 @@
+allowBuilds:
+  esbuild: true
+  keccak: true
+  unrs-resolver: true
