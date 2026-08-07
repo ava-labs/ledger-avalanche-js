@@ -235,6 +235,10 @@ export default class AvalancheApp {
         LedgerError.DataIsInvalid,
         LedgerError.BadKeyHandle,
         LedgerError.SignVerifyError,
+        // The device replies with this when the accumulated payload exceeds its
+        // upload buffer. Without it in the accepted list the transport raises a
+        // TransportStatusError and the real reason is lost.
+        LedgerError.OutputBufferTooSmall,
       ])
       .then((response: Buffer) => {
         const errorCodeData = response.slice(-2);
@@ -349,6 +353,7 @@ export default class AvalancheApp {
           LedgerError.DataIsInvalid,
           LedgerError.BadKeyHandle,
           LedgerError.SignVerifyError,
+          LedgerError.OutputBufferTooSmall,
         ])
         .then((response: Buffer) => {
           const errorCodeData = response.slice(-2);
@@ -403,47 +408,54 @@ export default class AvalancheApp {
     const msg = this.concatMessageAndChangePath(message, paths);
 
     // Send transaction for review
-    const response = await this.signGetChunks(msg, path_prefix).then(
-      (chunks) => {
-        if (!chunks || chunks.length === 0 || !chunks[0]) {
-          throw new Error("Invalid chunks array");
-        }
-        return this.signSendChunk(
-          1,
-          chunks.length,
-          chunks[0],
-          FIRST_MESSAGE,
-          INS.SIGN,
-        ).then(async (response) => {
-          // initialize response
-          let result = {
-            returnCode: response.returnCode,
-            errorMessage: response.errorMessage,
-            signatures: null as null | Map<string, Buffer>,
-          };
-
-          // send chunks
-          for (let i = 1; i < chunks.length; i += 1) {
-            const chunk = chunks[i];
-            if (!chunk) {
-              throw new Error(`Invalid chunk at index ${i}`);
-            }
-            result = await this.signSendChunk(
-              1 + i,
-              chunks.length,
-              chunk,
-              NEXT_MESSAGE,
-              INS.SIGN,
-            );
-            if (result.returnCode !== LedgerError.NoErrors) {
-              break;
-            }
+    const response = await this.signGetChunks(msg, path_prefix)
+      .then(
+        (chunks) => {
+          if (!chunks || chunks.length === 0 || !chunks[0]) {
+            throw new Error("Invalid chunks array");
           }
-          return result;
-        }, processErrorResponse);
-      },
-      processErrorResponse,
-    );
+          return this.signSendChunk(
+            1,
+            chunks.length,
+            chunks[0],
+            FIRST_MESSAGE,
+            INS.SIGN,
+          ).then(async (response) => {
+            // initialize response
+            let result = {
+              returnCode: response.returnCode,
+              errorMessage: response.errorMessage,
+              signatures: null as null | Map<string, Buffer>,
+            };
+
+            // send chunks
+            for (let i = 1; i < chunks.length; i += 1) {
+              const chunk = chunks[i];
+              if (!chunk) {
+                throw new Error(`Invalid chunk at index ${i}`);
+              }
+              result = await this.signSendChunk(
+                1 + i,
+                chunks.length,
+                chunk,
+                NEXT_MESSAGE,
+                INS.SIGN,
+              );
+              if (result.returnCode !== LedgerError.NoErrors) {
+                break;
+              }
+            }
+            return result;
+          });
+        },
+        // NOTE: `.catch` rather than a second `.then` argument on purpose. An
+        // onRejected handler only sees rejections of the promise it is attached
+        // to, not ones raised inside its own onFulfilled callback -- and the
+        // chunk loop above runs inside that callback. Attached as a rejection
+        // argument, a mid-upload failure escaped as a raw TransportStatusError
+        // instead of being mapped to a { returnCode, errorMessage }.
+      )
+      .catch(processErrorResponse);
 
     if (response.returnCode !== LedgerError.NoErrors) {
       return response;
@@ -480,47 +492,50 @@ export default class AvalancheApp {
     const avax_msg = Buffer.from(`${header}${msgSize}${content}`, "utf8");
 
     // Send msg for review
-    const response = await this.signGetChunks(avax_msg, path_prefix).then(
-      (chunks) => {
-        if (!chunks || chunks.length === 0 || !chunks[0]) {
-          throw new Error("Invalid chunks array");
-        }
-        return this.signSendChunk(
-          1,
-          chunks.length,
-          chunks[0],
-          FIRST_MESSAGE,
-          INS.SIGN_MSG,
-        ).then(async (response) => {
-          // initialize response
-          let result = {
-            returnCode: response.returnCode,
-            errorMessage: response.errorMessage,
-            signatures: null as null | Map<string, Buffer>,
-          };
-
-          // send chunks
-          for (let i = 1; i < chunks.length; i += 1) {
-            const chunk = chunks[i];
-            if (!chunk) {
-              throw new Error(`Invalid chunk at index ${i}`);
-            }
-            result = await this.signSendChunk(
-              1 + i,
-              chunks.length,
-              chunk,
-              NEXT_MESSAGE,
-              INS.SIGN_MSG,
-            );
-            if (result.returnCode !== LedgerError.NoErrors) {
-              break;
-            }
+    const response = await this.signGetChunks(avax_msg, path_prefix)
+      .then(
+        (chunks) => {
+          if (!chunks || chunks.length === 0 || !chunks[0]) {
+            throw new Error("Invalid chunks array");
           }
-          return result;
-        }, processErrorResponse);
-      },
-      processErrorResponse,
-    );
+          return this.signSendChunk(
+            1,
+            chunks.length,
+            chunks[0],
+            FIRST_MESSAGE,
+            INS.SIGN_MSG,
+          ).then(async (response) => {
+            // initialize response
+            let result = {
+              returnCode: response.returnCode,
+              errorMessage: response.errorMessage,
+              signatures: null as null | Map<string, Buffer>,
+            };
+
+            // send chunks
+            for (let i = 1; i < chunks.length; i += 1) {
+              const chunk = chunks[i];
+              if (!chunk) {
+                throw new Error(`Invalid chunk at index ${i}`);
+              }
+              result = await this.signSendChunk(
+                1 + i,
+                chunks.length,
+                chunk,
+                NEXT_MESSAGE,
+                INS.SIGN_MSG,
+              );
+              if (result.returnCode !== LedgerError.NoErrors) {
+                break;
+              }
+            }
+            return result;
+          });
+        },
+        // See the note in sign(): the rejection handler must be a `.catch` so it
+        // also covers failures raised inside the chunk loop above.
+      )
+      .catch(processErrorResponse);
 
     if (response.returnCode !== LedgerError.NoErrors) {
       return response;
