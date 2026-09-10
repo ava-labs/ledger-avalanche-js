@@ -1,4 +1,4 @@
-import Transport from "@ledgerhq/hw-transport";
+import { LedgerTransport } from "./types";
 
 export const CLA = 0x80;
 export const CLA_ETH = 0xe0;
@@ -144,7 +144,7 @@ export function processErrorResponse(response?: any) {
   };
 }
 
-export function getVersion(transport: Transport) {
+export function getVersion(transport: LedgerTransport) {
   return transport.send(CLA, INS.GET_VERSION, 0, 0).then((response) => {
     const errorCodeData = response.slice(-2);
     if (errorCodeData.length < 2) {

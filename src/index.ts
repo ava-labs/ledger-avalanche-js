@@ -14,7 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  ******************************************************************************* */
-import Transport from "@ledgerhq/hw-transport";
 import {
   CHAIN_ID_SIZE,
   CHUNK_SIZE,
@@ -56,6 +55,7 @@ import {
   ResponseVersion,
   ResponseWalletId,
   ResponseXPub,
+  LedgerTransport,
 } from "./types";
 
 import Eth from "@ledgerhq/hw-app-eth";
@@ -146,7 +146,7 @@ export default class AvalancheApp {
   private eth;
 
   constructor(
-    transport: Transport,
+    transport: LedgerTransport,
     ethScrambleKey = "w0w",
     ethLoadConfig: LoadConfig = {},
   ) {
@@ -155,7 +155,10 @@ export default class AvalancheApp {
       throw new Error("Transport has not been defined");
     }
 
-    this.eth = new Eth(transport, ethScrambleKey, ethLoadConfig);
+    // hw-app-eth's constructor demands the nominal `Transport` class, which the
+    // structural LedgerTransport deliberately is not. At runtime Eth needs only `send`
+    // and `decorateAppAPIMethods`, both of which a DMK-backed transport implements.
+    this.eth = new Eth(transport as any, ethScrambleKey, ethLoadConfig);
   }
 
   private static prepareChunks(message: Buffer, serializedPathBuffer?: Buffer) {

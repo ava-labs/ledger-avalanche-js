@@ -11,9 +11,6 @@ importers:
       '@ledgerhq/hw-app-eth':
         specifier: 6.47.1
         version: 6.47.1(react@19.0.0)
-      '@ledgerhq/hw-transport':
-        specifier: 6.31.13
-        version: 6.31.13
       '@ledgerhq/types-live':
         specifier: 6.116.0
         version: 6.116.0
