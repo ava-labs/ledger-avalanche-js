@@ -65,4 +65,17 @@ export interface LedgerTransport {
     statusList?: number[],
     options?: { abortTimeoutMs?: number },
   ) => Promise<Buffer>;
+
+  /**
+   * Required by `@ledgerhq/hw-app-eth`, whose constructor wraps its methods in an app-level
+   * lock through this hook -- so `new Eth(transport)` throws before a byte is sent if it is
+   * missing. Declared here so the type is honest about what this SDK's constructor needs:
+   * a hw-transport `Transport` has it, and so does a DMK-backed transport. `BaseApp`-only
+   * SDKs do not need this member.
+   */
+  decorateAppAPIMethods(
+    self: any,
+    methods: string[],
+    scrambleKey: string,
+  ): void;
 }
