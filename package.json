@@ -31,7 +31,7 @@
   "typings": "./dist/index.d.ts",
   "scripts": {
     "build": "pnpm build:cjs & pnpm build:esm & wait",
-    "build:cjs": "tsc",
+    "build:cjs": "tsc -p tsconfig.build.json",
     "build:esm": "esbuild src/index.ts --bundle --platform=neutral --format=esm --outfile=esm/index.js --external:@ledgerhq/* --external:bs58",
     "format": "FORCE_COLOR=1 prettier --write . && sort-package-json",
     "format:check": "FORCE_COLOR=1 prettier --check .",
@@ -45,11 +45,14 @@
     "last 2 versions"
   ],
   "dependencies": {
-    "@ledgerhq/hw-app-eth": "6.47.1",
-    "@ledgerhq/types-live": "6.116.0",
+    "@ledgerhq/context-module": "2.5.0",
+    "@ledgerhq/device-signer-kit-ethereum": "1.18.0",
     "bs58": "6.0.0"
   },
   "devDependencies": {
+    "@ledgerhq/device-management-kit": "1.9.0",
+    "@types/jest": "30.0.0",
+    "@types/node": "^24.13.4",
     "@typescript-eslint/eslint-plugin": "^8.65.0",
     "@typescript-eslint/parser": "^8.65.0",
     "esbuild": "0.28.1",
@@ -61,9 +64,14 @@
     "eslint-plugin-unused-imports": "^4.4.1",
     "jest": "^30.4.2",
     "prettier": "^3.9.6",
+    "rxjs": "7.8.2",
     "sort-package-json": "^4.0.0",
     "ts-jest": "^29.4.12",
     "typescript": "^5.6.2"
+  },
+  "peerDependencies": {
+    "@ledgerhq/device-management-kit": "^1.9.0",
+    "rxjs": "7.8.2"
   },
   "publishConfig": {
     "access": "public"

@@ -2,6 +2,16 @@ import { LedgerTransport } from "./types";
 
 export const CLA = 0x80;
 export const CLA_ETH = 0xe0;
+/** Ethereum-app instructions this SDK still sends by hand (the DMK signer covers the rest). */
+export const INS_ETH = {
+  GET_APP_CONFIGURATION: 0x06,
+  PROVIDE_ERC20_TOKEN_INFORMATION: 0x0a,
+  SIGN_EIP712_MESSAGE: 0x0c,
+  PROVIDE_NFT_INFORMATION: 0x14,
+  SET_PLUGIN: 0x16,
+};
+/** P2 of `INS_ETH.SIGN_EIP712_MESSAGE` selecting the hashed (v0) implementation. */
+export const P2_EIP712_HASHED = 0x00;
 export const CHUNK_SIZE = 250;
 export const APP_KEY = "AVAX";
 export const FIRST_MESSAGE = 0x01;
