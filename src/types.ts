@@ -1,3 +1,9 @@
+import type { ContextModule } from "@ledgerhq/context-module";
+import type {
+  DeviceManagementKit,
+  DeviceSessionId,
+} from "@ledgerhq/device-management-kit";
+
 export interface ResponseBase {
   errorMessage: string;
   returnCode: number;
@@ -65,17 +71,21 @@ export interface LedgerTransport {
     statusList?: number[],
     options?: { abortTimeoutMs?: number },
   ) => Promise<Buffer>;
+}
 
-  /**
-   * Required by `@ledgerhq/hw-app-eth`, whose constructor wraps its methods in an app-level
-   * lock through this hook -- so `new Eth(transport)` throws before a byte is sent if it is
-   * missing. Declared here so the type is honest about what this SDK's constructor needs:
-   * a hw-transport `Transport` has it, and so does a DMK-backed transport. `BaseApp`-only
-   * SDKs do not need this member.
-   */
-  decorateAppAPIMethods(
-    self: any,
-    methods: string[],
-    scrambleKey: string,
-  ): void;
+/**
+ * What the EVM (C-Chain) methods need on top of the transport.
+ *
+ * Signing on the C-Chain goes through the Device Management Kit's Ethereum signer, which
+ * drives the device from a DMK session rather than through `send`. Pass the same `dmk`
+ * and `sessionId` that back the `DMKTransport` given to the constructor. Callers who only
+ * use the X/P chains can leave this out entirely.
+ */
+export interface EvmSignerOptions {
+  dmk: DeviceManagementKit;
+  sessionId: DeviceSessionId;
+  /** Identifies the integrator to Ledger's clear-signing metadata services. */
+  originToken?: string;
+  /** Replaces the signer's default clear-signing context module, e.g. to sign offline. */
+  contextModule?: ContextModule;
 }
