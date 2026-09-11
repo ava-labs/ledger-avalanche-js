@@ -14,11 +14,11 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  ******************************************************************************* */
-import Transport from "@ledgerhq/hw-transport";
 import {
   CHAIN_ID_SIZE,
   CHUNK_SIZE,
   CLA,
+  CLA_ETH,
   COLLECTION_NAME_MAX_LEN,
   ADDRESS_LENGTH,
   ALGORITHM_ID_1,
@@ -31,6 +31,7 @@ import {
   getVersion,
   HASH_LEN,
   INS,
+  INS_ETH,
   LAST_MESSAGE,
   LedgerError,
   NEXT_MESSAGE,
@@ -40,6 +41,7 @@ import {
   TYPE_1,
   VERSION_1,
   P2_VALUES,
+  P2_EIP712_HASHED,
   ED25519_PK_SIZE,
 } from "./common";
 import {
@@ -56,19 +58,29 @@ import {
   ResponseVersion,
   ResponseWalletId,
   ResponseXPub,
+  LedgerTransport,
+  EvmSignerOptions,
 } from "./types";
 
-import Eth from "@ledgerhq/hw-app-eth";
+import {
+  SignerEthBuilder,
+  type SignerEth,
+  type TypedData,
+} from "@ledgerhq/device-signer-kit-ethereum";
 
 import {
-  LedgerEthTransactionResolution,
-  LoadConfig,
-  ResolutionConfig,
-} from "@ledgerhq/hw-app-eth/lib/services/types";
-import { EIP712Message } from "@ledgerhq/types-live";
+  evmDerivationPath,
+  hexToBytes,
+  runDeviceAction,
+  stripHexPrefix,
+  toEvmTransactionSignature,
+  toEvmTypedDataSignature,
+} from "./evm";
 
 export * from "./types";
 export { LedgerError };
+export { DeviceActionError } from "./evm";
+export type { TypedData } from "@ledgerhq/device-signer-kit-ethereum";
 
 function processGetAddrResponse(response: Buffer) {
   let partialResponse = response;
@@ -143,19 +155,19 @@ function processGetXPubResponse(response: Buffer) {
 
 export default class AvalancheApp {
   transport;
-  private eth;
+  private readonly evm: EvmSignerOptions | undefined;
+  private signer: SignerEth | undefined;
 
-  constructor(
-    transport: Transport,
-    ethScrambleKey = "w0w",
-    ethLoadConfig: LoadConfig = {},
-  ) {
+  /**
+   * @param transport - anything that can send an APDU (`DMKTransport`, or a legacy hw-transport)
+   * @param evm - the DMK session behind that transport; needed only for the C-Chain (EVM) methods
+   */
+  constructor(transport: LedgerTransport, evm?: EvmSignerOptions) {
     this.transport = transport;
     if (!transport) {
       throw new Error("Transport has not been defined");
     }
-
-    this.eth = new Eth(transport, ethScrambleKey, ethLoadConfig);
+    this.evm = evm;
   }
 
   private static prepareChunks(message: Buffer, serializedPathBuffer?: Buffer) {
@@ -731,38 +743,129 @@ export default class AvalancheApp {
     return await this._walletId(true);
   }
 
-  signEVMTransaction(
-    path: string,
-    rawTxHex: string,
-    resolution?: LedgerEthTransactionResolution | null,
-  ): Promise<{
-    s: string;
-    v: string;
-    r: string;
-  }> {
-    return this.eth.signTransaction(path, rawTxHex, resolution);
+  // ---------------------------------------------------------------------------
+  // EVM (C-Chain)
+  //
+  // Signing goes through the Device Management Kit's Ethereum signer, which replaces
+  // `@ledgerhq/hw-app-eth` (deprecated, removed September 2026). The few APDUs the kit has
+  // no equivalent for are sent through the transport, laid out exactly as hw-app-eth did.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * The Ethereum signer, built on first use so that callers who only touch the X/P chains
+   * never pay for it -- or need a DMK session at all.
+   */
+  private get ethSigner(): SignerEth {
+    if (this.signer === undefined) {
+      if (this.evm === undefined) {
+        throw new Error(
+          "EVM signing needs a Device Management Kit session: construct AvalancheApp with { dmk, sessionId }",
+        );
+      }
+      const { dmk, sessionId, originToken, contextModule } = this.evm;
+      const builder = new SignerEthBuilder({
+        dmk,
+        sessionId,
+        ...(originToken !== undefined ? { originToken } : {}),
+      });
+      if (contextModule !== undefined) {
+        builder.withContextModule(contextModule);
+      }
+      this.signer = builder.build();
+    }
+    return this.signer;
   }
 
-  getETHAddress(
+  /**
+   * Signs a serialized C-Chain transaction.
+   *
+   * Clear-signing context (token metadata, plugins, trusted names) is resolved by the
+   * signer's context module, so there is no `resolution` argument any more.
+   *
+   * @param path - BIP-32 path, e.g. `m/44'/60'/0'/0/0`
+   * @param rawTxHex - the RLP-encoded transaction as hex (`0x` prefix optional)
+   * @returns `r`, `s` and `v` as hex strings, as `hw-app-eth` returned them
+   */
+  async signEVMTransaction(
     path: string,
-    boolDisplay?: boolean,
-    boolChaincode?: boolean,
+    rawTxHex: string,
+  ): Promise<{ s: string; v: string; r: string }> {
+    const signature = await runDeviceAction(
+      this.ethSigner.signTransaction(
+        evmDerivationPath(path),
+        hexToBytes(rawTxHex),
+        { skipOpenApp: true },
+      ),
+    );
+    return toEvmTransactionSignature(signature);
+  }
+
+  async getETHAddress(
+    path: string,
+    boolDisplay = false,
+    boolChaincode = false,
   ): Promise<{
     publicKey: string;
     address: string;
     chainCode?: string;
   }> {
-    return this.eth.getAddress(path, boolDisplay, boolChaincode);
+    const { publicKey, address, chainCode } = await runDeviceAction(
+      this.ethSigner.getAddress(evmDerivationPath(path), {
+        checkOnDevice: boolDisplay,
+        returnChainCode: boolChaincode,
+        skipOpenApp: true,
+      }),
+    );
+    return chainCode === undefined
+      ? { publicKey, address }
+      : { publicKey, address, chainCode };
   }
 
-  getAppConfiguration(): Promise<{
+  async getAppConfiguration(): Promise<{
     arbitraryDataEnabled: number;
     erc20ProvisioningNecessary: number;
     starkEnabled: number;
     starkv2Supported: number;
     version: string;
   }> {
-    return this.eth.getAppConfiguration();
+    const response = await this.transport.send(
+      CLA_ETH,
+      INS_ETH.GET_APP_CONFIGURATION,
+      0x00,
+      0x00,
+    );
+    if (response.length < 4) {
+      throw new Error(
+        `Malformed app configuration response: ${response.length} bytes`,
+      );
+    }
+    const flags = response.readUInt8(0);
+    return {
+      arbitraryDataEnabled: flags & 0x01,
+      erc20ProvisioningNecessary: flags & 0x02,
+      starkEnabled: flags & 0x04,
+      starkv2Supported: flags & 0x08,
+      version: `${response.readUInt8(1)}.${response.readUInt8(2)}.${response.readUInt8(3)}`,
+    };
+  }
+
+  /**
+   * Sends one of the Ethereum app's "provide context" APDUs.
+   *
+   * Same contract as hw-app-eth: resolves `true` when the app took the data, `false` for
+   * the status words meaning "this app cannot use it" (so callers can fall back to blind
+   * signing), and rejects on anything else.
+   */
+  private async provideEthContext(
+    ins: number,
+    data: Buffer,
+    tolerated: number[],
+  ): Promise<boolean> {
+    const response = await this.transport.send(CLA_ETH, ins, 0x00, 0x00, data, [
+      LedgerError.NoErrors,
+      ...tolerated,
+    ]);
+    return response.readUInt16BE(response.length - 2) === LedgerError.NoErrors;
   }
 
   async provideERC20TokenInformation(
@@ -815,7 +918,12 @@ export default class AvalancheApp {
     buffer.writeUInt32BE(chainId, offset);
     offset += 4;
 
-    return await this.eth.provideERC20TokenInformation(buffer.toString("hex"));
+    // 0x6d00: an app too old to know this instruction
+    return await this.provideEthContext(
+      INS_ETH.PROVIDE_ERC20_TOKEN_INFORMATION,
+      buffer,
+      [0x6d00],
+    );
   }
 
   async provideNFTInformation(
@@ -885,7 +993,12 @@ export default class AvalancheApp {
 
     fakeDerSignature.copy(new Uint8Array(buffer), offset);
 
-    return await this.eth.provideNFTInformation(buffer.toString("hex"));
+    // 0x6d00: an app too old to know this instruction
+    return await this.provideEthContext(
+      INS_ETH.PROVIDE_NFT_INFORMATION,
+      buffer,
+      [0x6d00],
+    );
   }
 
   _generateFakeDerSignature(): Buffer {
@@ -972,40 +1085,89 @@ export default class AvalancheApp {
 
     signatureBuffer.copy(new Uint8Array(buffer), offset);
 
-    return await this.eth.setPlugin(buffer.toString("hex"));
-  }
-
-  async clearSignTransaction(
-    path: string,
-    rawTxHex: string,
-    resolutionConfig: ResolutionConfig,
-    throwOnError = false,
-  ): Promise<{ r: string; s: string; v: string }> {
-    return await this.eth.clearSignTransaction(
-      path,
-      rawTxHex,
-      resolutionConfig,
-      throwOnError,
+    // 0x6a80: plugin name too short or too long; 0x6984: plugin not installed;
+    // 0x6d00: an app too old to know this instruction
+    return await this.provideEthContext(
+      INS_ETH.SET_PLUGIN,
+      buffer,
+      [0x6a80, 0x6984, 0x6d00],
     );
   }
 
-  async signEIP712Message(
+  /**
+   * @deprecated `hw-app-eth`'s resolution step is now done inside the signer, so this is
+   * the same call as {@link signEVMTransaction}. It will be removed in the next major.
+   */
+  async clearSignTransaction(
     path: string,
-    jsonMessage: EIP712Message,
-    fullImplem = false,
-  ): Promise<{ v: number; s: string; r: string }> {
-    return await this.eth.signEIP712Message(path, jsonMessage, fullImplem);
+    rawTxHex: string,
+  ): Promise<{ r: string; s: string; v: string }> {
+    return await this.signEVMTransaction(path, rawTxHex);
   }
 
+  /**
+   * Signs an EIP-712 typed-data message, showing its fields on the device.
+   *
+   * The message is the usual `{ domain, types, primaryType, message }` object. The signer
+   * always uses the app's full EIP-712 implementation (the one Ledger keeps after
+   * September 2026) and falls back to the hashed one only when the app rejects it.
+   */
+  async signEIP712Message(
+    path: string,
+    typedData: TypedData,
+  ): Promise<{ v: number; s: string; r: string }> {
+    const signature = await runDeviceAction(
+      this.ethSigner.signTypedData(evmDerivationPath(path), typedData, {
+        skipOpenApp: true,
+      }),
+    );
+    return toEvmTypedDataSignature(signature);
+  }
+
+  /**
+   * Signs an EIP-712 message from its two hashes (the "v0" flow), showing only the
+   * hashes on the device.
+   *
+   * @deprecated This is the flow Ledger removes from its own Ethereum app in September
+   * 2026 and the Device Management Kit has no equivalent for. The Avalanche app still
+   * implements it, so the APDU is sent by hand for now; prefer {@link signEIP712Message}.
+   */
   async signEIP712HashedMessage(
     path: string,
     domainSeparatorHex: string,
     hashStructMessageHex: string,
   ): Promise<{ v: number; s: string; r: string }> {
-    return await this.eth.signEIP712HashedMessage(
-      path,
-      domainSeparatorHex,
-      hashStructMessageHex,
+    const domainSeparator = Buffer.from(
+      stripHexPrefix(domainSeparatorHex),
+      "hex",
     );
+    const hashStruct = Buffer.from(stripHexPrefix(hashStructMessageHex), "hex");
+    if (domainSeparator.length !== HASH_LEN || hashStruct.length !== HASH_LEN) {
+      throw new Error(
+        "domainSeparatorHex and hashStructMessageHex must each be 32 bytes of hex",
+      );
+    }
+    const data = Buffer.concat([
+      new Uint8Array(serializePath(path.startsWith("m/") ? path : `m/${path}`)),
+      new Uint8Array(domainSeparator),
+      new Uint8Array(hashStruct),
+    ]);
+    const response = await this.transport.send(
+      CLA_ETH,
+      INS_ETH.SIGN_EIP712_MESSAGE,
+      0x00,
+      P2_EIP712_HASHED,
+      data,
+    );
+    if (response.length < 1 + 2 * HASH_LEN) {
+      throw new Error(
+        `Malformed EIP-712 signature response: ${response.length} bytes`,
+      );
+    }
+    return {
+      v: response.readUInt8(0),
+      r: response.subarray(1, 1 + HASH_LEN).toString("hex"),
+      s: response.subarray(1 + HASH_LEN, 1 + 2 * HASH_LEN).toString("hex"),
+    };
   }
 }

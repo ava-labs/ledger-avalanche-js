@@ -2,6 +2,20 @@
   "compilerOptions": {
     "module": "commonjs",
     "moduleResolution": "node",
+    // Ledger's DMK packages publish their types only through package.json "exports",
+    // which the classic "node" resolution never reads. Point at them directly rather than
+    // moving the whole build to node16 resolution, which bs58's packaging does not survive.
+    "paths": {
+      "@ledgerhq/device-management-kit": [
+        "./node_modules/@ledgerhq/device-management-kit/lib/types/index.d.ts"
+      ],
+      "@ledgerhq/device-signer-kit-ethereum": [
+        "./node_modules/@ledgerhq/device-signer-kit-ethereum/lib/types/index.d.ts"
+      ],
+      "@ledgerhq/context-module": [
+        "./node_modules/@ledgerhq/context-module/lib/types/index.d.ts"
+      ]
+    },
     "target": "es2020",
     "strict": true,
     "exactOptionalPropertyTypes": true,
