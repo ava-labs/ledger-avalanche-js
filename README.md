@@ -34,7 +34,12 @@ const app = new AvalancheApp(new DMKTransport(dmk, sessionId), {
 
 await app.getAddressAndPubKey("m/44'/9000'/0'/0/0", true, "avax"); // X/P chain
 await app.signEVMTransaction("m/44'/60'/0'/0/0", rawTxHex); // C chain
+await app.signPersonalMessage("m/44'/60'/0'/0/0", messageHex); // C chain, EIP-191
 ```
+
+`signPersonalMessage` is the exception on the C-Chain: it sends its APDU through the
+transport, so it works without the DMK session. Pass the message bytes as hex; the app adds
+the `\x19Ethereum Signed Message:\n` prefix itself.
 
 Any object with a hw-transport-style `send(cla, ins, p1, p2, data?, statusList?)` still
 works as the first argument, but the deprecated `@ledgerhq/hw-transport` packages stop

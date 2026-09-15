@@ -42,6 +42,8 @@ import {
   VERSION_1,
   P2_VALUES,
   P2_EIP712_HASHED,
+  P1_PERSONAL_MESSAGE_FIRST,
+  P1_PERSONAL_MESSAGE_MORE,
   ED25519_PK_SIZE,
 } from "./common";
 import {
@@ -1162,6 +1164,54 @@ export default class AvalancheApp {
     if (response.length < 1 + 2 * HASH_LEN) {
       throw new Error(
         `Malformed EIP-712 signature response: ${response.length} bytes`,
+      );
+    }
+    return {
+      v: response.readUInt8(0),
+      r: response.subarray(1, 1 + HASH_LEN).toString("hex"),
+      s: response.subarray(1 + HASH_LEN, 1 + 2 * HASH_LEN).toString("hex"),
+    };
+  }
+
+  /**
+   * Signs an EIP-191 personal message (`personal_sign`), showing it on the device.
+   *
+   * The APDU is sent through the transport, not the Device Management Kit signer, so this
+   * works without `{ dmk, sessionId }`. It is laid out exactly as `hw-app-eth`'s
+   * `signPersonalMessage` laid it out; the app prepends `"\x19Ethereum Signed Message:\n"`
+   * and the length itself, so pass the bare message.
+   *
+   * @param path - BIP-32 path, e.g. `m/44'/60'/0'/0/0`
+   * @param messageHex - the message bytes as hex (`0x` prefix optional), not the text itself
+   * @returns `v` (27 or 28) and unprefixed hex `r`/`s`, as `hw-app-eth` returned them
+   */
+  async signPersonalMessage(
+    path: string,
+    messageHex: string,
+  ): Promise<{ v: number; r: string; s: string }> {
+    const message = hexToBytes(messageHex);
+    const length = Buffer.alloc(4);
+    length.writeUInt32BE(message.length);
+    // path | message length (u32 BE) | message, split across as many APDUs as it takes
+    const payload = Buffer.concat([
+      new Uint8Array(serializePath(path.startsWith("m/") ? path : `m/${path}`)),
+      new Uint8Array(length),
+      message,
+    ]);
+
+    let response: Buffer = Buffer.alloc(0);
+    for (let offset = 0; offset < payload.length; offset += CHUNK_SIZE) {
+      response = await this.transport.send(
+        CLA_ETH,
+        INS_ETH.SIGN_PERSONAL_MESSAGE,
+        offset === 0 ? P1_PERSONAL_MESSAGE_FIRST : P1_PERSONAL_MESSAGE_MORE,
+        0x00,
+        payload.subarray(offset, offset + CHUNK_SIZE),
+      );
+    }
+    if (response.length < 1 + 2 * HASH_LEN) {
+      throw new Error(
+        `Malformed personal message signature response: ${response.length} bytes`,
       );
     }
     return {
