@@ -1181,9 +1181,22 @@ export default class AvalancheApp {
    * `signPersonalMessage` laid it out; the app prepends `"\x19Ethereum Signed Message:\n"`
    * and the length itself, so pass the bare message.
    *
-   * @param path - BIP-32 path, e.g. `m/44'/60'/0'/0/0`
+   * Differences from `hw-app-eth` when migrating:
+   * - The path must have 3 to 5 levels, as for the SDK's other methods. `hw-app-eth` accepted
+   *   any depth; a shorter or longer path now throws before anything is sent.
+   * - An empty message is not rejected (`hw-app-eth` threw): the device shows the review
+   *   without a message page and signs it.
+   *
+   * There is no size check before sending. The app checks the size only after the last chunk
+   * arrives, so a message that is too large is sent in full and then rejected. The limit
+   * depends on the content: the app shows each non-ASCII byte as a 4-character `\xNN` code,
+   * so such messages reach it sooner.
+   *
+   * @param path - BIP-32 path with 3 to 5 levels, e.g. `m/44'/60'/0'/0/0`
    * @param messageHex - the message bytes as hex (`0x` prefix optional), not the text itself
-   * @returns `v` (27 or 28) and unprefixed hex `r`/`s`, as `hw-app-eth` returned them
+   * @returns `v` = 27 + recovery id and unprefixed hex `r`/`s`, as `hw-app-eth` returned them.
+   *   `v` is 27 or 28 in practice; 29 or 30 would need R.x ≥ the curve order, which
+   *   essentially never happens.
    */
   async signPersonalMessage(
     path: string,
