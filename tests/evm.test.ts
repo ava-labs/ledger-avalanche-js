@@ -370,4 +370,76 @@ describe("AvalancheApp EVM APDUs still sent by hand", () => {
       app.signEIP712HashedMessage(PATH, "0xaabb", "cc".repeat(32)),
     ).rejects.toThrow("32 bytes");
   });
+
+  it("signPersonalMessage lays out path + length + message on INS 0x08 without a DMK session", async () => {
+    const transport = new FakeTransport(
+      "1c" + "33".repeat(32) + "44".repeat(32) + "9000",
+    );
+    const app = new AvalancheApp(transport);
+    const message = Buffer.from("Hello Avalanche");
+
+    await expect(
+      app.signPersonalMessage("44'/60'/0'/0/0", "0x" + message.toString("hex")),
+    ).resolves.toEqual({ v: 0x1c, r: "33".repeat(32), s: "44".repeat(32) });
+
+    expect(transport.calls).toHaveLength(1);
+    const call = transport.calls[0];
+    expect(call).toMatchObject({ cla: 0xe0, ins: 0x08, p1: 0x00, p2: 0x00 });
+    // same bytes hw-app-eth's signPersonalMessage sends
+    expect(call?.data?.toString("hex")).toBe(
+      "05" +
+        "8000002c" +
+        "8000003c" +
+        "80000000" +
+        "00000000" +
+        "00000000" +
+        "0000000f" +
+        message.toString("hex"),
+    );
+    expect(SignerEthBuilder).not.toHaveBeenCalled();
+  });
+
+  it("signPersonalMessage splits a long message, P1 0x00 first and 0x80 after", async () => {
+    const transport = new FakeTransport(
+      "9000",
+      "9000",
+      "1b" + "33".repeat(32) + "44".repeat(32) + "9000",
+    );
+    const app = new AvalancheApp(transport);
+    const message = Buffer.alloc(600, 0x41);
+
+    await expect(
+      app.signPersonalMessage(PATH, message.toString("hex")),
+    ).resolves.toEqual({ v: 0x1b, r: "33".repeat(32), s: "44".repeat(32) });
+
+    // path (21) + length (4) + message (600) = 625 bytes in 250-byte chunks
+    expect(
+      transport.calls.map((call) => [call.ins, call.p1, call.data?.length]),
+    ).toEqual([
+      [0x08, 0x00, 250],
+      [0x08, 0x80, 250],
+      [0x08, 0x80, 125],
+    ]);
+    const payload = Buffer.concat(
+      transport.calls.map((call) => new Uint8Array(call.data ?? [])),
+    );
+    expect(payload.readUInt32BE(21)).toBe(600);
+    expect(payload.subarray(25).equals(new Uint8Array(message))).toBe(true);
+  });
+
+  it("signPersonalMessage refuses a message that is not hex, before touching the device", async () => {
+    const transport = new FakeTransport();
+    const app = new AvalancheApp(transport);
+    await expect(app.signPersonalMessage(PATH, "Hello!")).rejects.toThrow(
+      "even-length hex",
+    );
+    expect(transport.calls).toHaveLength(0);
+  });
+
+  it("signPersonalMessage rejects a response too short to hold v/r/s", async () => {
+    const app = new AvalancheApp(new FakeTransport("1b9000"));
+    await expect(app.signPersonalMessage(PATH, "00")).rejects.toThrow(
+      "Malformed personal message signature response",
+    );
+  });
 });
