@@ -10,9 +10,7 @@ on:
     types:
       - published
 
-permissions:
-  contents: read
-  id-token: write # Required for npm OIDC trusted publishing
+permissions: {}
 
 concurrency:
   group: publish-${{ github.ref }}
@@ -20,11 +18,16 @@ concurrency:
 
 jobs:
   publish:
+    permissions:
+      contents: read
+      id-token: write
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
         # node-version is required: without it the job inherits the runner default
