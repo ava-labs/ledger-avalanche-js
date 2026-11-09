@@ -12,8 +12,7 @@ on:
       - develop
       - release/*
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: main-${{ github.ref }}
@@ -21,10 +20,14 @@ concurrency:
 
 jobs:
   build:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: Install node
         uses: actions/setup-node@v5
